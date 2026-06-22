@@ -22,12 +22,12 @@ const query = `
   out center;
 `;
 
-const url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query.trim());
+const url = 'https://overpass.kumi.systems/api/interpreter?data=' + encodeURIComponent(query.trim());
 
 const options = {
   headers: {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/115.0',
-    'Accept': 'application/json'
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'application/json, text/plain, */*'
   }
 };
 
