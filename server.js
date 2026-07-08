@@ -280,7 +280,7 @@ app.delete('/api/locations/:id', (req, res) => {
     });
 });
 
-// COMMENTS
+// GET comments for a location
 app.get('/api/locations/:id/comments', (req, res) => {
     const { id } = req.params;
     db.query('SELECT * FROM comments WHERE location_id = ? ORDER BY created_at DESC', [id], (err, results) => {
@@ -289,9 +289,15 @@ app.get('/api/locations/:id/comments', (req, res) => {
     });
 });
 
+// POST a new comment
 app.post('/api/locations/:id/comments', (req, res) => {
     const { id } = req.params;
     const { user_name, text, rating } = req.body;
+    
+    if (!user_name || !text || !rating) {
+        return res.status(400).json({ error: 'Name, text, and rating are required' });
+    }
+
     db.query('INSERT INTO comments (location_id, user_name, text, rating) VALUES (?, ?, ?, ?)', [id, user_name, text, rating], (err, result) => {
         if (err) return res.status(500).json({ error: err.message });
         
