@@ -307,119 +307,148 @@ app.post('/api/locations/:id/comments', (req, res) => {
 });
 
 // =====================================================
-// SMART CHATBOT ENGINE — Smart Wisata Sumut
+// SMART CHATBOT ENGINE — 100% Data Driven
+// Hanya menjawab berdasarkan data yang ada di database
 // =====================================================
 const smartChatbot = (message, dbResults) => {
     const m = message.toLowerCase().trim();
 
-    const greetings = ['halo', 'hai', 'hello', 'hi', 'selamat', 'assalamualaikum', 'permisi'];
+    // Jika tidak ada data sama sekali
+    if (!dbResults || dbResults.length === 0) {
+        return 'Maaf, saya belum memiliki data destinasi wisata saat ini. Silakan coba lagi nanti.';
+    }
+
+    // ── Salam ──
+    const greetings = ['halo', 'hai', 'hello', 'hi', 'selamat', 'assalamualaikum', 'permisi', 'apa kabar'];
     if (greetings.some(g => m.includes(g))) {
-        return `Halo! 👋 Selamat datang di Smart Wisata Sumut! Saya asisten AI yang siap membantu Anda menemukan destinasi wisata terbaik di Sumatera Utara. Anda bisa tanya soal kuliner, pantai, alam, sejarah, religi, hiburan, atau pusat perbelanjaan. Apa yang ingin Anda ketahui?`;
+        const categories = [...new Set(dbResults.map(r => r.category))].join(', ');
+        return `Halo! Selamat datang di Smart Wisata Sumut. Saya hanya bisa menjawab berdasarkan data destinasi wisata yang tersedia. Saat ini ada ${dbResults.length} destinasi dengan kategori: ${categories}. Silakan tanya tentang salah satunya!`;
     }
 
+    // ── Terima kasih ──
     if (m.includes('terima kasih') || m.includes('makasih') || m.includes('thank')) {
-        return `Sama-sama! 😊 Selamat berwisata di Sumatera Utara. Semoga perjalanan Anda menyenangkan! Kalau ada pertanyaan lain, saya siap membantu kapan saja.`;
+        return 'Sama-sama! Semoga informasi wisata yang saya berikan bermanfaat. Selamat berwisata di Sumatera Utara!';
     }
 
-    if (m.includes('danau toba') || (m.includes('toba') && !m.includes('samosir'))) {
-        const loc = dbResults.find(r => r.name.toLowerCase().includes('danau toba'));
-        const rating = loc ? `Rating: ${loc.rating}/5` : '';
-        return `Danau Toba adalah danau vulkanik terbesar di dunia dengan luas sekitar 1.130 km persegi! ${rating}. Di tengah danau terdapat Pulau Samosir, pusat kebudayaan Batak Toba. Akses dari Medan sekitar 3 sampai 4 jam berkendara. Suhu di sana 18 sampai 25 derajat Celcius, jadi jangan lupa bawa jaket ya!`;
+    // ── Daftar semua destinasi ──
+    if (m.includes('daftar') || m.includes('semua') || m.includes('list') || m.includes('apa saja')) {
+        const list = dbResults.map((r, i) => `${i + 1}. ${r.name} (${r.category})`).join(', ');
+        return `Berikut daftar ${dbResults.length} destinasi wisata yang tersedia: ${list}. Mau tahu detail salah satunya?`;
     }
 
-    if (m.includes('samosir')) {
-        return `Pulau Samosir adalah pulau vulkanik di tengah Danau Toba yang merupakan pusat kebudayaan Batak Toba. Di sana Anda bisa menemukan desa tradisional, makam raja Batak, kerajinan tenun Ulos, dan menikmati pemandangan danau yang memukau dari berbagai sisi pulau.`;
+    // ── Rekomendasi / terbaik ──
+    if (m.includes('rekomendasi') || m.includes('terbaik') || m.includes('top') || m.includes('populer') || m.includes('bagus') || m.includes('saran')) {
+        const top = [...dbResults].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 5);
+        const list = top.map((k, i) => `${i + 1}. ${k.name} (${k.category}) rating ${k.rating || 'N/A'} bintang`).join(', ');
+        return `Berdasarkan rating tertinggi dari data kami, berikut top ${top.length} destinasi: ${list}. Mau saya ceritakan detail salah satunya?`;
     }
 
-    if (m.includes('kuliner') || m.includes('makanan') || m.includes('makan') || m.includes('restoran') || m.includes('wisata kuliner')) {
-        const kuliners = dbResults.filter(r => r.category === 'Kuliner').slice(0, 3);
-        const list = kuliners.map(k => `${k.name} dengan rating ${k.rating} di ${k.city}`).join(', ');
-        return `Wisata kuliner Sumatera Utara sangat kaya! Beberapa rekomendasi: ${list}. Makanan wajib coba antara lain Soto Medan dengan kuah santan yang gurih, Mie Aceh yang pedas dan kaya rempah, Bika Ambon sebagai oleh-oleh khas, dan Ikan Mas Arsik khas masakan Batak. Mana yang ingin Anda coba duluan?`;
+    // ── Pencarian berdasarkan kategori ──
+    const categoryMap = {
+        kuliner: 'Kuliner',
+        makanan: 'Kuliner',
+        makan: 'Kuliner',
+        restoran: 'Kuliner',
+        kafe: 'Kuliner',
+        pantai: 'Pantai',
+        beach: 'Pantai',
+        laut: 'Pantai',
+        alam: 'Alam',
+        hiking: 'Alam',
+        trekking: 'Alam',
+        'air terjun': 'Alam',
+        hutan: 'Alam',
+        gunung: 'Alam',
+        sejarah: 'Sejarah',
+        museum: 'Sejarah',
+        istana: 'Sejarah',
+        heritage: 'Sejarah',
+        religi: 'Religi',
+        masjid: 'Religi',
+        gereja: 'Religi',
+        vihara: 'Religi',
+        ibadah: 'Religi',
+        hiburan: 'Hiburan',
+        rekreasi: 'Hiburan',
+        taman: 'Hiburan',
+        'kebun binatang': 'Hiburan',
+        wahana: 'Hiburan',
+        belanja: 'Pusat Perbelanjaan',
+        mall: 'Pusat Perbelanjaan',
+        shopping: 'Pusat Perbelanjaan',
+        pasar: 'Pusat Perbelanjaan',
+    };
+
+    for (const [keyword, categoryName] of Object.entries(categoryMap)) {
+        if (m.includes(keyword)) {
+            const matches = dbResults.filter(r => r.category === categoryName);
+            if (matches.length === 0) {
+                return `Maaf, belum ada data destinasi kategori "${categoryName}" dalam database kami saat ini.`;
+            }
+            const sorted = [...matches].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+            const list = sorted.map(k => `${k.name} di ${k.city} (rating ${k.rating || 'N/A'}, jam: ${k.operating_hours || '-'})`).join('; ');
+            return `Destinasi kategori ${categoryName} yang tersedia dalam data kami (${matches.length} tempat): ${list}. Mau tahu detail salah satunya?`;
+        }
     }
 
-    if (m.includes('pantai') || m.includes('beach') || m.includes('surfing') || m.includes('snorkeling')) {
-        const beaches = dbResults.filter(r => r.category === 'Pantai').slice(0, 3);
-        const list = beaches.map(k => `${k.name} di ${k.city}`).join(', ');
-        return `Pantai di Sumatera Utara sangat indah! Beberapa pilihan: ${list}. Pantai Lagundri dan Sorake di Nias adalah pantai kelas dunia untuk surfing dengan ombak yang konsisten dan sempurna, terkenal di kalangan peselancar internasional sejak tahun 1970-an! Waktu terbaik berkunjung adalah April hingga September.`;
+    // ── Jam operasional ──
+    if (m.includes('jam') || m.includes('buka') || m.includes('tutup') || m.includes('operasional')) {
+        // Cari nama lokasi spesifik dulu
+        const found = dbResults.find(r => m.includes(r.name.toLowerCase()));
+        if (found) {
+            return `Jam operasional ${found.name}: ${found.operating_hours || 'informasi belum tersedia dalam data kami'}. Lokasi: ${found.city}.`;
+        }
+        // Umum
+        const withHours = dbResults.filter(r => r.operating_hours).slice(0, 5);
+        const list = withHours.map(r => `${r.name}: ${r.operating_hours}`).join('; ');
+        return `Berikut jam operasional beberapa destinasi dari data kami: ${list}. Tanya nama destinasi spesifik untuk info lengkapnya!`;
     }
 
-    if (m.includes('alam') || m.includes('hiking') || m.includes('trekking') || m.includes('air terjun') || m.includes('hutan')) {
-        const natures = dbResults.filter(r => r.category === 'Alam').slice(0, 3);
-        const list = natures.map(k => `${k.name} di ${k.city}`).join(', ');
-        return `Wisata alam Sumatera Utara luar biasa! Antara lain: ${list}. Bukit Lawang adalah pintu masuk ke Taman Nasional Gunung Leuser untuk melihat orangutan Sumatera liar di habitatnya. Air Terjun Sipiso-piso setinggi 120 meter adalah salah satu yang tertinggi di Indonesia dengan pemandangan langsung ke Danau Toba!`;
+    // ── Kota / Kabupaten tertentu ──
+    const cities = [...new Set(dbResults.map(r => r.city).filter(Boolean))];
+    for (const city of cities) {
+        if (city && m.includes(city.toLowerCase().replace('kabupaten ', '').replace('kota ', ''))) {
+            const cityLocs = dbResults.filter(r => r.city === city);
+            const list = cityLocs.map(r => `${r.name} (${r.category})`).join(', ');
+            return `Destinasi wisata di ${city} berdasarkan data kami (${cityLocs.length} tempat): ${list}. Ingin tahu detail salah satunya?`;
+        }
     }
 
-    if (m.includes('sejarah') || m.includes('museum') || m.includes('istana') || m.includes('batak') || m.includes('kolonial')) {
-        const histories = dbResults.filter(r => r.category === 'Sejarah').slice(0, 3);
-        const list = histories.map(k => `${k.name} di ${k.city}`).join(', ');
-        return `Wisata sejarah Sumatera Utara sangat kaya: ${list}. Istana Maimun dibangun tahun 1888, merupakan ikon Kota Medan peninggalan Kesultanan Deli dengan arsitektur perpaduan Islam, Melayu, dan Eropa. Museum Batak TB Silalahi Center di tepi Danau Toba menyimpan ribuan koleksi artefak budaya Batak.`;
-    }
-
-    if (m.includes('religi') || m.includes('masjid') || m.includes('gereja') || m.includes('vihara') || m.includes('ibadah')) {
-        const religions = dbResults.filter(r => r.category === 'Religi').slice(0, 3);
-        const list = religions.map(k => `${k.name} di ${k.city}`).join(', ');
-        return `Wisata religi Sumatera Utara: ${list}. Masjid Raya Al-Mashun Medan dibangun tahun 1906, merupakan salah satu masjid terindah di Indonesia dengan arsitektur perpaduan Timur Tengah, India Mughal, dan Spanyol. Vihara Gunung Timur adalah vihara Tionghoa terbesar di Sumatera!`;
-    }
-
-    if (m.includes('hiburan') || m.includes('rekreasi') || m.includes('taman') || m.includes('kebun binatang')) {
-        const ents = dbResults.filter(r => r.category === 'Hiburan').slice(0, 3);
-        const list = ents.map(k => `${k.name} di ${k.city}`).join(', ');
-        return `Wisata hiburan Sumatera Utara: ${list}. Medan Zoo memiliki koleksi satwa asli Sumatera seperti harimau Sumatera, orangutan, dan gajah. Taman Teladan adalah taman kota favorit warga Medan untuk olahraga dan piknik keluarga.`;
-    }
-
-    if (m.includes('belanja') || m.includes('mall') || m.includes('shopping') || m.includes('pusat perbelanjaan') || m.includes('pasar')) {
-        const malls = dbResults.filter(r => r.category === 'Pusat Perbelanjaan').slice(0, 3);
-        const list = malls.map(k => `${k.name} di ${k.city}`).join(', ');
-        return `Pusat perbelanjaan di Sumatera Utara: ${list}. Sun Plaza adalah mall premium terbesar Medan dengan lebih dari 300 tenant, buka pukul 10 sampai 22. Pasar Berastagi di dataran tinggi Karo adalah surga belanja produk pertanian segar seperti markisa, jeruk, dan stroberi langsung dari petani!`;
-    }
-
-    if (m.includes('medan') || m.includes('kota medan')) {
-        const medanLocs = dbResults.filter(r => r.city === 'Kota Medan').slice(0, 4);
-        const list = medanLocs.map(k => `${k.name} kategori ${k.category}`).join(', ');
-        return `Kota Medan adalah ibukota Sumatera Utara dan kota terbesar ke-3 di Indonesia! Destinasi populer di Medan antara lain: ${list}. Medan mudah diakses via Bandara Internasional Kualanamu, sekitar 40 menit dari pusat kota. Ada kereta bandara yang praktis!`;
-    }
-
-    if (m.includes('nias') || m.includes('lagundri') || m.includes('sorake')) {
-        return `Pulau Nias adalah surga tersembunyi di Sumatera Utara! Daya tarik utamanya adalah Pantai Lagundri dan Sorake, surf spot kelas dunia. Ada juga tradisi Lompat Batu yang unik, rumah adat Omo Hada yang megah, dan festival budaya yang spektakuler. Akses bisa via penerbangan dari Kualanamu sekitar 1 jam, atau kapal feri dari Sibolga selama 8 sampai 10 jam.`;
-    }
-
-    if (m.includes('rekomendasi') || m.includes('saran') || m.includes('terbaik') || m.includes('top') || m.includes('populer')) {
-        const topLocs = [...dbResults].sort((a, b) => b.rating - a.rating).slice(0, 5);
-        const list = topLocs.map((k, i) => `${i + 1}. ${k.name} kategori ${k.category} dengan rating ${k.rating}`).join(', ');
-        return `Berikut top 5 destinasi wisata Sumatera Utara berdasarkan rating: ${list}. Semua destinasi ini sangat layak dikunjungi! Ingin saya bantu merencanakan rute perjalanan?`;
-    }
-
-    if (m.includes('transportasi') || m.includes('akses') || m.includes('perjalanan') || m.includes('naik apa')) {
-        return `Cara menuju destinasi wisata Sumut: Bandara Kualanamu adalah hub utama Medan dengan kereta bandara ke pusat kota. Dari Medan ke Danau Toba sekitar 3 sampai 4 jam, ke Bukit Lawang sekitar 3 jam, ke Berastagi sekitar 2 jam, dan ke Pantai Cermin sekitar 1 jam. Ke Nias bisa naik pesawat dari Kualanamu sekitar 1 jam, atau kapal feri dari Sibolga. Sewa mobil dengan sopir lokal sangat direkomendasikan untuk perjalanan yang nyaman!`;
-    }
-
-    if (m.includes('jam') || m.includes('buka') || m.includes('tutup') || m.includes('waktu')) {
-        return `Informasi jam operasional umum: Alam dan pantai umumnya buka 24 jam dan terbaik dikunjungi pagi atau sore hari. Museum dan wisata sejarah umumnya buka pukul 8 sampai 17. Tempat religi buka dari pukul 5 pagi. Mall buka pukul 10 sampai 22. Restoran dan kuliner bervariasi, banyak yang buka hingga malam hari. Disarankan cek Google Maps untuk jam terkini sebelum berkunjung.`;
-    }
-
-    // Dynamic lookup in DB
-    const matching = dbResults.filter(r =>
+    // ── Pencarian nama lokasi spesifik ──
+    const nameMatch = dbResults.filter(r =>
         r.name.toLowerCase().includes(m) ||
-        (r.description && r.description.toLowerCase().includes(m)) ||
-        r.category.toLowerCase().includes(m)
+        m.split(' ').some(word => word.length > 3 && r.name.toLowerCase().includes(word))
     );
 
-    if (matching.length > 0) {
-        const loc = matching[0];
-        return `Saya menemukan informasi tentang ${loc.name}! Kategori: ${loc.category}. Rating: ${loc.rating}/5. Lokasi: ${loc.city}. Jam buka: ${loc.operating_hours || 'informasi belum tersedia'}. ${loc.description ? loc.description : ''} Ada yang ingin Anda tanyakan lagi?`;
+    if (nameMatch.length > 0) {
+        const loc = nameMatch[0];
+        const desc = loc.description ? `Deskripsi: ${loc.description.substring(0, 150)}...` : '';
+        return `Informasi tentang ${loc.name}: Kategori ${loc.category}. Lokasi di ${loc.city}, ${loc.province || 'Sumatera Utara'}. Rating: ${loc.rating || 'belum ada'} bintang. Jam buka: ${loc.operating_hours || 'tidak tersedia'}. ${desc}`;
     }
 
-    return `Saya belum memiliki informasi spesifik tentang itu. Coba tanyakan tentang destinasi wisata seperti Danau Toba, Bukit Lawang, atau Nias. Atau tanyakan berdasarkan kategori seperti kuliner, pantai, alam, sejarah, religi, hiburan, atau belanja. Bisa juga tanya info transportasi atau rekomendasi destinasi terbaik. Saya siap membantu!`;
+    // ── Pencarian kata kunci dalam deskripsi ──
+    const descMatch = dbResults.filter(r =>
+        r.description && m.split(' ').some(word => word.length > 4 && r.description.toLowerCase().includes(word))
+    );
+
+    if (descMatch.length > 0) {
+        const list = descMatch.slice(0, 3).map(r => `${r.name} (${r.category})`).join(', ');
+        return `Berdasarkan kata kunci Anda, destinasi yang mungkin relevan dari data kami: ${list}. Mau info lebih lanjut tentang salah satunya?`;
+    }
+
+    // ── Fallback: hanya dalam konteks data ──
+    const categories = [...new Set(dbResults.map(r => r.category))].join(', ');
+    return `Maaf, saya tidak menemukan informasi tersebut dalam data destinasi wisata kami. Saya hanya dapat menjawab tentang ${dbResults.length} destinasi yang ada dalam sistem. Kategori tersedia: ${categories}. Coba tanyakan nama destinasi atau kategorinya!`;
 };
 
 app.post('/api/chatbot', (req, res) => {
     const { message } = req.body;
     if (!message) return res.status(400).json({ error: 'Message is required' });
 
-    db.query('SELECT id, name, category, city, rating, description, operating_hours FROM locations', [], (err, results) => {
+    db.query('SELECT id, name, category, city, province, rating, description, operating_hours FROM locations ORDER BY rating DESC', [], (err, results) => {
         const dbData = err ? [] : results;
         const reply = smartChatbot(message, dbData);
-        res.json({ reply });
+        res.json({ reply, totalLocations: dbData.length });
     });
 });
 
