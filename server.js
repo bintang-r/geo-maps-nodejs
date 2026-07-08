@@ -188,18 +188,25 @@ app.get('/api/locations/nearby', (req, res) => {
     });
 });
 
-// Get GeoJSON for a specific province
+// Get GeoJSON for a specific province by combining its regencies
 app.get('/api/provinces/:id/geojson', (req, res) => {
     const { id } = req.params;
-    db.query('SELECT geojson_data FROM provinces WHERE id = ?', [id], (err, results) => {
+    db.query('SELECT geojson_data FROM regencies WHERE province_id = ?', [id], (err, results) => {
         if (err) {
             return res.status(500).json({ error: err.message });
         }
-        if (results.length === 0 || !results[0].geojson_data) {
+        if (results.length === 0) {
             return res.status(404).json({ error: 'GeoJSON not found for this province' });
         }
         try {
-            res.json(JSON.parse(results[0].geojson_data));
+            const allFeatures = [];
+            results.forEach(row => {
+                if(row.geojson_data) {
+                    const geo = JSON.parse(row.geojson_data);
+                    if(geo && geo.features) allFeatures.push(...geo.features);
+                }
+            });
+            res.json({ type: 'FeatureCollection', features: allFeatures });
         } catch (e) {
             res.status(500).json({ error: 'Invalid GeoJSON data stored in database' });
         }
