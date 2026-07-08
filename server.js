@@ -189,48 +189,19 @@ app.get('/api/locations/nearby', (req, res) => {
     });
 });
 
-// Get GeoJSON for a specific province by combining its regencies
+// Get GeoJSON for a specific province by returning the pre-computed regencies boundaries
 app.get('/api/provinces/:id/geojson', (req, res) => {
     const { id } = req.params;
-    db.query('SELECT name, geojson_data FROM regencies WHERE province_id = ?', [id], (err, results) => {
+    db.query('SELECT regencies_geojson_data FROM provinces WHERE id = ?', [id], (err, results) => {
         if (err) {
             return res.status(500).json({ error: err.message });
         }
-        if (results.length === 0) {
+        if (results.length === 0 || !results[0].regencies_geojson_data) {
+            // Fallback if regencies_geojson_data is not generated yet
             return res.status(404).json({ error: 'GeoJSON not found for this province' });
         }
         try {
-            const allDissolvedFeatures = [];
-            results.forEach(row => {
-                if(row.geojson_data) {
-                    const geo = JSON.parse(row.geojson_data);
-                    if(geo && geo.features && geo.features.length > 0) {
-                        // Tag each district with the clean regency name
-                        geo.features.forEach(f => {
-                            if (!f.properties) f.properties = {};
-                            f.properties.clean_regency = row.name;
-                        });
-                        
-                        // Dissolve all districts in this regency into a single polygon/multipolygon
-                        try {
-                            const dissolved = turf.dissolve(geo, { propertyName: 'clean_regency' });
-                            // The result of dissolve is a FeatureCollection of merged features
-                            if (dissolved && dissolved.features) {
-                                // Put back the regency property so frontend MapViewer.vue can read it
-                                dissolved.features.forEach(f => {
-                                    f.properties.regency = row.name;
-                                });
-                                allDissolvedFeatures.push(...dissolved.features);
-                            }
-                        } catch(e) {
-                            // If turf fails (e.g. invalid topology), fallback to original features
-                            geo.features.forEach(f => { f.properties.regency = row.name; });
-                            allDissolvedFeatures.push(...geo.features);
-                        }
-                    }
-                }
-            });
-            res.json({ type: 'FeatureCollection', features: allDissolvedFeatures });
+            res.json(JSON.parse(results[0].regencies_geojson_data));
         } catch (e) {
             res.status(500).json({ error: 'Invalid GeoJSON data stored in database' });
         }
