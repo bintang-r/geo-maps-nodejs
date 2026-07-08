@@ -146,10 +146,44 @@ app.post('/api/regencies', (req, res) => {
 
 // Get all locations
 app.get('/api/locations', (req, res) => {
-    db.query('SELECT * FROM locations', [], (err, results) => {
+    const { search } = req.query;
+    let query = 'SELECT * FROM locations';
+    let params = [];
+    if (search) {
+        query += ' WHERE name LIKE ? OR category LIKE ? OR description LIKE ?';
+        const searchPattern = `%${search}%`;
+        params.push(searchPattern, searchPattern, searchPattern);
+    }
+    db.query(query, params, (err, results) => {
         if (err) {
             return res.status(500).json({ error: err.message });
         }
+        res.json(results);
+    });
+});
+
+// Find nearby locations
+app.get('/api/locations/nearby', (req, res) => {
+    const { lat, lng, radius } = req.query; // radius in km
+    if (!lat || !lng) return res.status(400).json({ error: 'lat and lng required' });
+    const rad = radius || 5;
+
+    // Haversine formula
+    const query = `
+        SELECT *, (
+            6371 * acos(
+                cos(radians(?)) * cos(radians(lat)) *
+                cos(radians(lng) - radians(?)) +
+                sin(radians(?)) * sin(radians(lat))
+            )
+        ) AS distance
+        FROM locations
+        HAVING distance < ?
+        ORDER BY distance
+        LIMIT 20
+    `;
+    db.query(query, [lat, lng, lat, rad], (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
         res.json(results);
     });
 });
@@ -194,7 +228,7 @@ app.post('/api/locations', (req, res) => {
     const imagesStr = Array.isArray(images) ? JSON.stringify(images) : (images || '[]');
 
     const query = `
-        INSERT INTO locations (name, lat, lng, category, address, country, province, city, district, image, description, operating_hours) 
+        INSERT INTO locations (name, lat, lng, category, address, country, province, city, district, images, description, operating_hours) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const params = [name, lat, lng, category, address, country, province, city, district, imagesStr, description, operating_hours];
@@ -216,7 +250,7 @@ app.put('/api/locations/:id', (req, res) => {
 
     const query = `
         UPDATE locations 
-        SET name = ?, lat = ?, lng = ?, category = ?, address = ?, country = ?, province = ?, city = ?, district = ?, image = ?, description = ?, operating_hours = ?
+        SET name = ?, lat = ?, lng = ?, category = ?, address = ?, country = ?, province = ?, city = ?, district = ?, images = ?, description = ?, operating_hours = ?
         WHERE id = ?
     `;
     const params = [name, lat, lng, category, address, country, province, city, district, imagesStr, description, operating_hours, id];
@@ -244,6 +278,54 @@ app.delete('/api/locations/:id', (req, res) => {
         }
         res.json({ message: 'Location deleted successfully' });
     });
+});
+
+// COMMENTS
+app.get('/api/locations/:id/comments', (req, res) => {
+    const { id } = req.params;
+    db.query('SELECT * FROM comments WHERE location_id = ? ORDER BY created_at DESC', [id], (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results);
+    });
+});
+
+app.post('/api/locations/:id/comments', (req, res) => {
+    const { id } = req.params;
+    const { user_name, text, rating } = req.body;
+    db.query('INSERT INTO comments (location_id, user_name, text, rating) VALUES (?, ?, ?, ?)', [id, user_name, text, rating], (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        
+        // Update average rating of location
+        db.query('SELECT AVG(rating) as avg_rating FROM comments WHERE location_id = ?', [id], (err, avgResult) => {
+            if (!err && avgResult.length > 0) {
+                db.query('UPDATE locations SET rating = ? WHERE id = ?', [avgResult[0].avg_rating, id]);
+            }
+        });
+
+        res.status(201).json({ id: result.insertId, location_id: id, user_name, text, rating });
+    });
+});
+
+// CHATBOT
+app.post('/api/chatbot', (req, res) => {
+    const { message } = req.body;
+    const lowerMessage = message.toLowerCase();
+    
+    let reply = "Maaf, saya tidak mengerti. Coba tanyakan tentang wisata, kuliner, pantai, atau lokasi tertentu.";
+    
+    if (lowerMessage.includes("wisata") || lowerMessage.includes("pariwisata")) {
+        reply = "Di Sumatera terdapat banyak tempat wisata menarik, seperti Danau Toba di Sumatera Utara atau Jam Gadang di Sumatera Barat.";
+    } else if (lowerMessage.includes("kuliner") || lowerMessage.includes("makanan")) {
+        reply = "Sumatera terkenal dengan kulinernya. Anda bisa mencoba Sate Padang Mak Syukur atau berbagai hidangan di pusat kota Medan.";
+    } else if (lowerMessage.includes("pantai")) {
+        reply = "Untuk pantai, Pantai Sorake di Nias sangat terkenal di kalangan peselancar karena ombaknya yang besar.";
+    } else if (lowerMessage.includes("toba")) {
+        reply = "Danau Toba adalah danau vulkanik terbesar di dunia yang terletak di Sumatera Utara. Sangat indah!";
+    } else if (lowerMessage.includes("halo") || lowerMessage.includes("hai")) {
+        reply = "Halo! Saya adalah asisten wisata Anda. Ada yang bisa saya bantu terkait informasi pariwisata di Sumatera?";
+    }
+    
+    res.json({ reply });
 });
 
 // Get statistics

@@ -49,12 +49,13 @@ connection.connect((err) => {
                     db.query("SELECT COUNT(*) AS count FROM categories", (err, results) => {
                         if (results && results[0].count === 0) {
                             const defaultCategories = [
-                                ['Perguruan Tinggi Negeri', '#3b82f6', 'fa-solid fa-graduation-cap'],
-                                ['Perguruan Tinggi Swasta', '#8b5cf6', 'fa-solid fa-school'],
-                                ['Rumah Sakit', '#ef4444', 'fa-solid fa-hospital'],
-                                ['Wisata', '#10b981', 'fa-solid fa-tree'],
-                                ['Pusat Perbelanjaan', '#f59e0b', 'fa-solid fa-cart-shopping'],
-                                ['Lainnya', '#64748b', 'fa-solid fa-map-pin']
+                                ['Kuliner', '#f59e0b', 'fa-solid fa-utensils'],
+                                ['Religi', '#8b5cf6', 'fa-solid fa-mosque'],
+                                ['Sejarah', '#78350f', 'fa-solid fa-monument'],
+                                ['Pantai', '#3b82f6', 'fa-solid fa-umbrella-beach'],
+                                ['Pusat Perbelanjaan', '#ec4899', 'fa-solid fa-cart-shopping'],
+                                ['Hiburan', '#ef4444', 'fa-solid fa-ticket'],
+                                ['Alam', '#10b981', 'fa-solid fa-tree']
                             ];
                             db.query("INSERT INTO categories (name, color, icon_name) VALUES ?", [defaultCategories]);
                         }
@@ -116,11 +117,26 @@ connection.connect((err) => {
                         district VARCHAR(100),
                         operating_hours VARCHAR(255),
                         images JSON,
+                        rating DOUBLE DEFAULT 0,
                         description TEXT,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 `;
                 db.query(createLocationsTable);
+
+                // COMMENTS
+                const createCommentsTable = `
+                    CREATE TABLE IF NOT EXISTS comments (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        location_id INT NOT NULL,
+                        user_name VARCHAR(100) NOT NULL,
+                        text TEXT NOT NULL,
+                        rating INT DEFAULT 5,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE CASCADE
+                    )
+                `;
+                db.query(createCommentsTable);
             };
 
             initDb();
