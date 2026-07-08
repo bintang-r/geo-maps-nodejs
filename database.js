@@ -74,7 +74,7 @@ connection.connect((err) => {
                     if (err) return console.error("Error provinces table:", err.message);
                     db.query("SELECT COUNT(*) AS count FROM provinces", (err, results) => {
                         if (results && results[0].count === 0) {
-                            db.query("INSERT INTO provinces (name) VALUES ('Sulawesi Selatan')");
+                            db.query("INSERT INTO provinces (name) VALUES ('Sumatera Utara')");
                         }
                     });
                 });
